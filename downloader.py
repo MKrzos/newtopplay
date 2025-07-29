@@ -12,28 +12,25 @@ def handle_exit(signum, frame):
     print("\nGraceful shutdown requested. Finishing current batch before exiting...")
     should_exit = True
 
-# Catch Ctrl+C (SIGINT)
+# catch sigint
 signal.signal(signal.SIGINT, handle_exit)
 
 def load_cursor():
     if os.path.exists("cursor_state.txt"):
         with open("cursor_state.txt", "r", encoding="utf-8") as f:
-            return Cursor(page=f.read().strip()[-2]) #lol
+            page = f.read().strip()[-2]#lol
+            return Cursor(page=page) #lol
     return None
 
-# Save cursor to file
 def save_cursor(cursor_value):
     with open("cursor_state.txt", "w", encoding="utf-8") as f:
         f.write(cursor_value or "")
 
-def save_user_count(user_count):
-    with open("user_count_state.txt", "w", encoding="utf-8") as f:
-        f.write(user_count)
-
 def load_user_count():
-    if os.path.exists("user_count_state.txt"):
-        with open("user_count_state.txt", "r", encoding="utf-8") as f:
-            return int(f.read().strip())
+    if os.path.exists("cursor_state.txt"):
+        with open("cursor_state.txt", "r", encoding="utf-8") as f:
+            page = int(f.read().strip()[-2])#lol
+            return page * 50 + 1#lol
     return 0
 
 # logging.getLogger("ossapi.ossapiv2").setLevel(logging.INFO)  # or WARNING
@@ -151,10 +148,10 @@ while(not should_exit):
     print(f"waiting {waiting_time}s before proceeding")
     time.sleep(max(0, 52 - (time2-time1))) #limit to batch of 51 per 51s
     time1 = time.perf_counter()
-    print(f"Fetching users ranked {user_count + 1} - {user_count + 50}")
+    print(f"Fetching users ranked {user_count} - {user_count + 49}")
     ranking_response = api.ranking(
-        GameMode.OSU,                # Mode standard
-        RankingType.PERFORMANCE,     # Ranking by pp 
+        GameMode.OSU,                
+        RankingType.PERFORMANCE,    
         cursor=api_cursor
     )
     api_cursor = ranking_response.cursor
@@ -166,20 +163,19 @@ while(not should_exit):
         save_user(user_stat)
         user_count += 1
 
-        # Step 2: Get user's top 50 scores
+        #Get top 50 scores
         #print(f"Fetching top 50 plays for {user.username}...")
         scores = api.user_scores(user.id, type="best", limit=50)
         relative_score_rank  = 1
         for score in scores:
             save_score(score, user.id, relative_score_rank)
             relative_score_rank += 1
-        conn.commit()  # Save after each user
+        conn.commit()
     time2 = time.perf_counter()
 
 print("cleaning up...")
 
 save_cursor(str(api_cursor))
-save_user_count(str(user_count))
 
 print("✅ Done!")
 conn.commit()
